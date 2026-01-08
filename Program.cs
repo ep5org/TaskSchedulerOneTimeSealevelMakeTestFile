@@ -40,7 +40,7 @@ namespace TableFill
     ///     Its anticipated usage involves calling it from within the program being tested, thus ensuring that the test data is current.
     /// </summary>
     /// <remarks>
-    ///     This version of the program is configured for 40 outputs followed by 8 inputs. The inputs are currently unused.
+    ///     This version of the program is configured for 40 outputs and 8 inputs. The inputs are currently unused.
     ///     With appropriate revisions, including comprehensive logging and error handling, it could be adapted for long-duration hardware testing.
     ///     Equally, it could be modified to run continuously in order to serve as a demo program for the I/O hardware.
     /// </remarks>
@@ -67,6 +67,7 @@ namespace TableFill
             SqlConnection connection = new("Server = System76; Database = TaskSchedulerOneTimeSealevel; Integrated Security = SSPI; TrustServerCertificate = true");
             connection.Open();
             //  Clear out all existing entries in the ControlEvent table.
+            //  This is necessitated by the event timing tied to the immediate run of TaskSchedulerOneTimeSealevel.
             string truncateQuery = "truncate table dbo.ControlEvent;";
             SqlCommand truncateCommand = new(truncateQuery, connection);
             truncateCommand.ExecuteNonQuery();
@@ -90,7 +91,7 @@ namespace TableFill
             EnterRandomControlEvents(recipeID, 0, command);
 
             //  Done with engines, Scotty; shut 'er down.
-            connection.Close();     //  Granted, a formality, but a useful one.
+            connection.Close();     //  Granted, a formality, but a familiar one.
             WriteLine("All entries have been written to the database.\n");
             WriteLine("We're done here, Sparky...\nHave a nice day . . . somewhere else.");
             return;
@@ -108,18 +109,18 @@ namespace TableFill
         /// <remarks>
         ///     This enables the program to be tested immediately with current, properly timed, single-use recipe data.
         ///     It creates a series of ON/OFF events for channels 0 through 39, with each channel being toggled twice in rapid succession.
-        ///     The effect is a parade of LEDs lighting up in numerical succession, demonstrating that each output can be written to in a predictable and controlled manner.
+        ///     The effect is a parade of LEDs lighting up in numerical succession, demonstrating that each output can be written to when and as required by the user's application.
         /// </remarks>
         static private void EnterSequentialControlEventsUp(int recipeID, int channelNmbr, SqlCommand command)
         {
             doAt = DateTime.Now;
             DateTime whenEntered;
             DateTime whenEdited;
+            whenEntered = whenEdited = DateTime.Now;
             int enteredBy = 1;
             int editedBy = 1;
             string notes = "Sequential test entry, pulsing up";
             byte status = 1;
-            whenEntered = whenEdited = DateTime.Now;
             digitalValue = ON;
 
             command.Parameters.AddWithValue("@recipeID", recipeID);
@@ -142,8 +143,8 @@ namespace TableFill
                 //  Flip channel output state
                 switch (digitalValue)
                 {
-                    case 1: digitalValue = OFF; break;
-                    case 0: digitalValue = ON; break;
+                    case ON: digitalValue = OFF; break;
+                    case OFF: digitalValue = ON; break;
                 }
                 command.Parameters["@digitalValue"].Value = digitalValue;
                 //  Increment op-time
@@ -172,8 +173,8 @@ namespace TableFill
                 //  Flip channel output state
                 switch (digitalValue)
                 {
-                    case 1: digitalValue = OFF; break;
-                    case 0: digitalValue = ON; break;
+                    case ON: digitalValue = OFF; break;
+                    case OFF: digitalValue = ON; break;
                 }
                 command.Parameters["@digitalValue"].Value = digitalValue;
                 //  Increment op-time
@@ -199,7 +200,7 @@ namespace TableFill
             digitalValue = ON;
             for (int indx = 0; indx < 40; ++indx)
             {
-                command.Parameters["@channelNmbr"].Value = channelNmbr++;   // N.B. Post-increment ONLY.
+                command.Parameters["@channelNmbr"].Value = channelNmbr++;   // N.B.: Post-increment ONLY.
                 command.Parameters["@digitalValue"].Value = digitalValue;
                 //  Increment op-time
                 doAt = doAt.Add(hopTime);
@@ -215,7 +216,7 @@ namespace TableFill
         ///     This turns all digital outputs off, as quickly as possible, before the random test entries begin.
         ///     The function turns all digital outputs OFF and does so in a manner limited by the physical constraints of the I/O hardware and the Ethernet connection.
         ///     That is, all outputs have one single event time, obliging the hardware to execute them as quickly as the physical limitations allow.
-        ///     The effect is all LEDs being turned OFF as close to simultaneously as possible.
+        ///     The effect is all LEDs being turned OFF as close to simultaneously as possible. The result is a graphical demonstration of I/O cycle speed.
         /// </summary>
         /// <remarks>
         ///     This function is implemented with an individual OFF command for each channel, all such events sharing the same when-to-execute timestamp.
@@ -228,7 +229,7 @@ namespace TableFill
             doAt = doAt.AddMilliseconds(100);
             int enteredBy = 1;
             int editedBy = 1;
-            byte digitalValue = 0;
+            byte digitalValue = OFF;
             string notes = "Turn all digital outputs off, as quickly as possible, before the random test entries begin.";
             byte status = 1;
             notes = "Intermediate all-off entry";
@@ -268,7 +269,7 @@ namespace TableFill
             byte status = 1;
 
             whenEntered = whenEdited = DateTime.Now;
-            digitalValue = 1;
+            digitalValue = ON;
 
             command.Parameters["@recipeID"].Value = recipeID;
             command.Parameters["@channelNmbr"].Value = channelNmbr;
@@ -295,8 +296,8 @@ namespace TableFill
                 //  Flip channel output state.
                 switch (digitalValue)
                 {
-                    case 1: digitalValue = OFF; break;
-                    case 0: digitalValue = ON; break;
+                    case ON: digitalValue = OFF; break;
+                    case OFF: digitalValue = ON; break;
                 }
                 command.Parameters["@digitalValue"].Value = digitalValue;
                 //  Increment op-time by random duration between 75 ms and 500 ms.
